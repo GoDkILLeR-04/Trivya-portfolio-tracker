@@ -15,17 +15,17 @@
 
 ## 🎯 Overview
 
-Trivya is a comprehensive Python-based portfolio analytics system designed for Indian equity investors and traders. Built with yfinance for real-time data, it provides institutional-grade risk metrics, Monte Carlo simulations, and professional visualizations.
+For Indian equity traders and investors, Trivya is a feature-rich portfolio analytics platform built on Python. It offers institutional-grade risk metrics, Monte Carlo simulations, and expert visualizations and was built with yfinance for real-time data.
 
-**Perfect for:** Equity Traders | Portfolio Managers | Finance Students | Quantitative Analysts
+**Ideal for:**  Quantitative analysts, portfolio managers, equity traders, and finance students
 
 ### Why This Project?
 
-- 📈 Track multiple stock positions with weighted average cost basis
-- 🎲 Monte Carlo simulations for portfolio projections (10,000+ scenarios)
-- 📊 Calculate Sharpe Ratio, Beta, VaR, Maximum Drawdown
-- 🖼️ Generate publication-ready charts and reports
-- 💾 Simple CSV-based data management
+- 📈 Use a weighted average cost basis to track several stock positions
+- 🎲 Using Monte Carlo simulations for portfolio projections (more than 10,000 scenarios).
+- 📊 Calculate the Sharpe Ratio, Beta, VaR, and Maximum Drawdown
+- 🖼️ Create reports and charts that are ready for publication
+- 💾 Basic data management using CSV
 
 ---
 
