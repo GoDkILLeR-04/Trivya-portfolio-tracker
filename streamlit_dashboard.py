@@ -11,6 +11,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
 from scipy.stats import norm
+from backtest_strategies import StrategyBacktester
+
 
 # Page configuration
 st.set_page_config(
@@ -42,7 +44,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigate to:",
-    ["🏠 Overview", "📈 Equity Analysis", "📉 Options Analysis", "⚙️ Settings"]
+    ["🏠 Overview", "📈 Equity Analysis", "📉 Options Analysis", "📊 Strategy Backtesting", "⚙️ Settings"]
 )
 
 # Load data functions
@@ -450,6 +452,29 @@ elif page == "📉 Options Analysis":
             color_continuous_scale='RdYlGn'
         )
         st.plotly_chart(fig, use_container_width=True)
+
+# ==================== Strategy Backtesting ====================
+elif page == "📊 Strategy Backtesting":
+
+    st.title("📊 Strategy Backtesting & Monte Carlo")
+
+    uploaded_file = st.file_uploader("Upload trade_history.csv", type="csv")
+
+    if st.button("Run Backtest"):
+
+        if uploaded_file:
+            backtester =  StrategyBacktester(uploaded_file)
+
+
+        else:
+            st.warning("Upload trade history file")
+            st.stop()
+
+        stats = backtester.backtest_options_trades()
+        mc_results = backtester.monte_carlo_simulation()
+
+        fig = backtester.create_visualizations(mc_results)
+        st.pyplot(fig)
 
 # ==================== SETTINGS PAGE ====================
 elif page == "⚙️ Settings":
