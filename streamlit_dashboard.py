@@ -455,26 +455,71 @@ elif page == "📉 Options Analysis":
 
 # ==================== Strategy Backtesting ====================
 elif page == "📊 Strategy Backtesting":
-
     st.title("📊 Strategy Backtesting & Monte Carlo")
 
     uploaded_file = st.file_uploader("Upload trade_history.csv", type="csv")
 
+    # user inputs for simulation
+    initial_capital = st.number_input("Initial capital (₹)", value=100000, step=1000)
+    num_trades = st.number_input("Number of trades to simulate", value=50, min_value=1)
+    num_simulations = st.number_input("Number of simulations", value=5000, min_value=100, step=100)
+
     if st.button("Run Backtest"):
-
-        if uploaded_file:
-            backtester =  StrategyBacktester(uploaded_file)
-
-
-        else:
-            st.warning("Upload trade history file")
+        if not uploaded_file:
+            st.warning("Please upload a trade_history.csv file to run the backtest.")
             st.stop()
 
-        stats = backtester.backtest_options_trades()
-        mc_results = backtester.monte_carlo_simulation()
+        try:
+            with st.spinner("Running backtest and Monte Carlo..."):
+                # Instantiate the class (pd.read_csv accepts Streamlit uploaded file object)
+                backtester = StrategyBacktester(uploaded_file)
 
-        fig = backtester.create_visualizations(mc_results)
-        st.pyplot(fig)
+                # run backtest
+                stats = backtester.backtest_options_trades()
+                if stats is None:
+                    st.error("Backtest returned no results — check uploaded CSV format and columns.")
+                    st.stop()
+
+                # run Monte Carlo (use values from inputs)
+                mc_results = backtester.monte_carlo_simulation(
+                    initial_capital=int(initial_capital),
+                    num_simulations=int(num_simulations),
+                    num_trades=int(num_trades)
+                )
+
+                # create visualizations (returns a matplotlib figure)
+                fig = backtester.create_visualizations(mc_results)
+
+            # --- Display summary metrics ---
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Total Trades", stats['total_trades'])
+            col2.metric("Win Rate", f"{stats['win_rate']:.1f}%")
+            col3.metric("Profit Factor", f"{stats['profit_factor']:.2f}")
+            col4.metric("Expectancy", f"₹{stats['expectancy']:.2f}")
+
+            # show dataframe of individual trade results (if available)
+            st.markdown("### Backtest — per-trade results")
+            if backtester.results is not None and not backtester.results.empty:
+                st.dataframe(backtester.results.reset_index(drop=True), use_container_width=True)
+            else:
+                st.info("No per-trade results to display.")
+
+            # render the matplotlib figure produced by create_visualizations()
+            st.markdown("### Monte Carlo & Backtest Visualizations")
+            st.pyplot(fig)
+
+            # optional: offer PNG download if create_visualizations saved it
+            try:
+                with open("backtest_analysis.png", "rb") as f:
+                    st.download_button("Download report PNG", f, file_name="backtest_analysis.png")
+            except FileNotFoundError:
+                # file might not be present — that's fine
+                pass
+
+        except Exception as e:
+            st.error("An error occurred while running the backtest.")
+            st.exception(e)
+
 
 # ==================== SETTINGS PAGE ====================
 elif page == "⚙️ Settings":
