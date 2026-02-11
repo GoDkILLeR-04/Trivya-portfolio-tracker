@@ -1,0 +1,9 @@
+entry_date,exit_date,strategy,position_type,entry_price,exit_price,quantity
+2024-10-01,2024-10-10,bear_put_spread,long,180,220,50
+2024-10-01,2024-10-10,bear_put_spread,short,120,90,50
+2024-10-05,2024-10-15,long_put,long,150,180,40
+2024-10-08,2024-10-12,long_call,long,200,150,25
+2024-10-10,2024-10-20,bear_put_spread,long,190,250,50
+2024-10-10,2024-10-20,bear_put_spread,short,130,80,50
+2024-10-15,2024-10-25,iron_condor,long,180,160,30
+2024-10-18,2024-10-24,long_put,long,170,200,35

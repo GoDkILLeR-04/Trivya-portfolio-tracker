@@ -1,0 +1,5 @@
+date,symbol,option_type,strike,expiry,quantity,premium_paid,strategy
+2024-10-20,NIFTY,PE,25150,2024-10-24,50,180,bear_put_spread
+2024-10-20,NIFTY,PE,24750,2024-10-24,-50,120,bear_put_spread
+2024-10-15,NIFTY,CE,25500,2024-10-31,25,200,long_call
+2024-10-18,NIFTY,PE,24900,2024-10-31,40,150,long_put
