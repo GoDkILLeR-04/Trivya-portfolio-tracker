@@ -1,5 +1,5 @@
 """
-Portfolio Analytics System - Week 1 Complete (FIXED)
+Portfolio Analytics System
 Tracks portfolio performance, calculates risk metrics, and generates visualizations
 Handles duplicate stock entries correctly
 """
