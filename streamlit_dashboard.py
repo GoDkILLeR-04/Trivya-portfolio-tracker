@@ -4,15 +4,14 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime
 from scipy.stats import norm
-import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
 
 # Try to import BacktestStrategies - with proper error handling
 try:
-    from backtest_strategies import BacktestStrategies
+    from backtest_strategies import StrategyBacktester
     from portfolio_tracker import PortfolioTracker
     BACKTEST_AVAILABLE = True
 except ImportError:
@@ -533,7 +532,7 @@ elif page == "📊 Strategy Backtesting":
         try:
             with st.spinner("Running backtest and Monte Carlo simulations..."):
                 # Instantiate the backtester
-                backtester = BacktestStrategies(uploaded_file)
+                backtester = StrategyBacktester(uploaded_file)
 
                 # Run backtest
                 stats = backtester.backtest_options_trades()
