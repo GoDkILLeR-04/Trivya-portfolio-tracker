@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
 
-# Try to import StrategyBacktester - with proper error handling
+# Try to import BacktestStrategies - with proper error handling
 try:
-    from backtest_strategies import StrategyBacktester
+    from backtest_strategies import BacktestStrategies
     from portfolio_tracker import PortfolioTracker
     BACKTEST_AVAILABLE = True
 except ImportError:
@@ -533,7 +533,7 @@ elif page == "📊 Strategy Backtesting":
         try:
             with st.spinner("Running backtest and Monte Carlo simulations..."):
                 # Instantiate the backtester
-                backtester = StrategyBacktester(uploaded_file)
+                backtester = BacktestStrategies(uploaded_file)
 
                 # Run backtest
                 stats = backtester.backtest_options_trades()
