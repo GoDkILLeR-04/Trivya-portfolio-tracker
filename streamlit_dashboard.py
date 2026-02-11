@@ -61,23 +61,23 @@ page = st.sidebar.radio(
 def load_equity_holdings():
     """Load equity holdings from CSV"""
     try:
-        df = pd.read_csv('sample_holdings.csv')  # Use sample data for demo
+        df = pd.read_csv('holdings.csv')  # Use sample data for demo
         df['date'] = pd.to_datetime(df['date'])
         return df
     except FileNotFoundError:
-        st.error("sample_holdings.csv not found!")
+        st.error("holdings.csv not found!")
         return pd.DataFrame()
 
 @st.cache_data(ttl=300)
 def load_options_positions():
     """Load options positions from CSV"""
     try:
-        df = pd.read_csv('sample_options_positions.csv')  # Use sample data
+        df = pd.read_csv('options_positions.csv')  # Use sample data
         df['date'] = pd.to_datetime(df['date'])
         df['expiry'] = pd.to_datetime(df['expiry'])
         return df
     except FileNotFoundError:
-        st.warning("sample_options_positions.csv not found. Options analysis unavailable.")
+        st.warning("options_positions.csv not found. Options analysis unavailable.")
         return pd.DataFrame()
 
 @st.cache_data(ttl=300)
@@ -584,9 +584,9 @@ elif page == "⚙️ Settings":
     
     st.subheader("📁 Data Files")
     st.info("**For Demo Mode:** This app uses sample data files")
-    st.code("sample_holdings.csv - Sample equity positions")
-    st.code("sample_options_positions.csv - Sample options positions")
-    st.code("sample_trade_history.csv - Sample trade history")
+    st.code("holdings.csv - Sample equity positions")
+    st.code("options_positions.csv - Sample options positions")
+    st.code("trade_history.csv - Sample trade history")
     
     st.markdown("---")
     st.subheader("📤 Upload Your Own Data")
