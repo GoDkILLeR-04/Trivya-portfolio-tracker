@@ -14,7 +14,8 @@ try:
     from backtest_strategies import StrategyBacktester
     from portfolio_tracker import PortfolioTracker
     BACKTEST_AVAILABLE = True
-except ImportError:
+except Exception as e:
+    print("IMPORT ERROR:", e)
     BACKTEST_AVAILABLE = False
 
 # Page configuration
