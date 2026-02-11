@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 import warnings
+
+from protfolio_tracker.holdings_tracker import PortfolioTracker
 warnings.filterwarnings('ignore')
 
 # Try to import StrategyBacktester - with proper error handling
@@ -368,6 +370,42 @@ elif page == "📈 Equity Analysis":
     
     st.plotly_chart(fig, use_container_width=True)
     
+    # ================= MONTE CARLO SECTION =================
+st.markdown("---")
+st.subheader("🎲 Portfolio Monte Carlo Projection")
+
+if st.button("Run 12-Month Projection"):
+
+    tracker = PortfolioTracker("holdings.csv")
+
+    tracker.fetch_current_prices()
+    tracker.fetch_historical_data()
+
+    mc_results = tracker.monte_carlo_portfolio_projection(
+        months=12,
+        num_simulations=5000
+    )
+
+    col1, col2 = st.columns(2)
+
+    col1.metric(
+        "Median Final Value",
+        f"₹{mc_results['median_final']:,.0f}"
+    )
+
+    col2.metric(
+        "Probability of Profit",
+        f"{mc_results['prob_profit']:.1f}%"
+    )
+
+    fig = tracker._plot_mc_projection(
+        mc_results["portfolio_values"],
+        tracker.holdings["current_value"].sum(),
+        12
+    )
+
+    st.pyplot(fig)
+
     # Individual stock metrics
     st.subheader("📋 Individual Stock Metrics")
     
@@ -465,7 +503,6 @@ elif page == "📉 Options Analysis":
 # ==================== Strategy Backtesting ====================
 elif page == "📊 Strategy Backtesting":
     st.title("📊 Strategy Backtesting & Monte Carlo")
-    
     # Check if backtesting is available
     if not BACKTEST_AVAILABLE:
         st.error("❌ **Backtesting Module Not Available**")
