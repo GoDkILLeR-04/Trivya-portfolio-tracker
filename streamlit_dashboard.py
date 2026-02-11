@@ -8,18 +8,15 @@ from datetime import datetime, timedelta
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 import warnings
-
-from protfolio_tracker.holdings_tracker import PortfolioTracker
 warnings.filterwarnings('ignore')
 
 # Try to import StrategyBacktester - with proper error handling
 try:
     from backtest_strategies import StrategyBacktester
+    from portfolio_tracker import PortfolioTracker
     BACKTEST_AVAILABLE = True
 except ImportError:
     BACKTEST_AVAILABLE = False
-    # Will show warning in sidebar later
-
 
 # Page configuration
 st.set_page_config(
