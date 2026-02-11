@@ -1,8 +1,3 @@
-"""
-Interactive Portfolio Analytics Dashboard
-Combines equity and options tracking in a web interface
-"""
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -11,7 +6,17 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
 from scipy.stats import norm
-from backtest_strategies import StrategyBacktester
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
+
+# Try to import StrategyBacktester - with proper error handling
+try:
+    from backtest_strategies import StrategyBacktester
+    BACKTEST_AVAILABLE = True
+except ImportError:
+    BACKTEST_AVAILABLE = False
+    # Will show warning in sidebar later
 
 
 # Page configuration
@@ -42,6 +47,10 @@ st.markdown("""
 st.sidebar.title("📊 Portfolio Dashboard")
 st.sidebar.markdown("---")
 
+# Show warning if backtesting not available
+if not BACKTEST_AVAILABLE:
+    st.sidebar.warning("⚠️ **Backtesting Unavailable**\n\nMake sure `backtest_strategies.py` is in the same folder!")
+
 page = st.sidebar.radio(
     "Navigate to:",
     ["🏠 Overview", "📈 Equity Analysis", "📉 Options Analysis", "📊 Strategy Backtesting", "⚙️ Settings"]
@@ -52,23 +61,23 @@ page = st.sidebar.radio(
 def load_equity_holdings():
     """Load equity holdings from CSV"""
     try:
-        df = pd.read_csv('holdings.csv')
+        df = pd.read_csv('sample_holdings.csv')  # Use sample data for demo
         df['date'] = pd.to_datetime(df['date'])
         return df
     except FileNotFoundError:
-        st.error("holdings.csv not found!")
+        st.error("sample_holdings.csv not found!")
         return pd.DataFrame()
 
 @st.cache_data(ttl=300)
 def load_options_positions():
     """Load options positions from CSV"""
     try:
-        df = pd.read_csv('options_positions.csv')
+        df = pd.read_csv('sample_options_positions.csv')  # Use sample data
         df['date'] = pd.to_datetime(df['date'])
         df['expiry'] = pd.to_datetime(df['expiry'])
         return df
     except FileNotFoundError:
-        st.warning("options_positions.csv not found. Options analysis unavailable.")
+        st.warning("sample_options_positions.csv not found. Options analysis unavailable.")
         return pd.DataFrame()
 
 @st.cache_data(ttl=300)
@@ -141,7 +150,7 @@ if page == "🏠 Overview":
     options_positions = load_options_positions()
     
     if equity_holdings.empty:
-        st.error("No equity data available. Please add holdings.csv")
+        st.error("No equity data available. Please add sample_holdings.csv")
         st.stop()
     
     # Fetch current prices
@@ -179,8 +188,8 @@ if page == "🏠 Overview":
         )
     
     with col4:
-        num_stocks = len(equity_holdings)
-        num_profitable = len(equity_holdings[equity_holdings['pnl'] > 0])
+        num_stocks = len(equity_holdings['symbol'].unique())
+        num_profitable = len(equity_holdings[equity_holdings['pnl'] > 0]['symbol'].unique())
         st.metric(
             "Positions",
             f"{num_stocks} stocks",
@@ -384,7 +393,7 @@ elif page == "📉 Options Analysis":
     options_df = load_options_positions()
     
     if options_df.empty:
-        st.warning("No options positions found. Add options_positions.csv to enable this feature.")
+        st.warning("No options positions found. Add sample_options_positions.csv to enable this feature.")
         st.stop()
     
     # Fetch Nifty spot
@@ -456,102 +465,175 @@ elif page == "📉 Options Analysis":
 # ==================== Strategy Backtesting ====================
 elif page == "📊 Strategy Backtesting":
     st.title("📊 Strategy Backtesting & Monte Carlo")
+    
+    # Check if backtesting is available
+    if not BACKTEST_AVAILABLE:
+        st.error("❌ **Backtesting Module Not Available**")
+        st.info("""
+        To enable backtesting:
+        1. Make sure `backtest_strategies.py` is in the same folder as this dashboard
+        2. Restart the Streamlit app
+        
+        Or upload a trade history CSV and we'll run basic analysis.
+        """)
+        st.stop()
+    
+    st.markdown("Upload your historical trades to analyze strategy performance and run Monte Carlo simulations.")
 
     uploaded_file = st.file_uploader("Upload trade_history.csv", type="csv")
 
-    # user inputs for simulation
-    initial_capital = st.number_input("Initial capital (₹)", value=100000, step=1000)
-    num_trades = st.number_input("Number of trades to simulate", value=50, min_value=1)
-    num_simulations = st.number_input("Number of simulations", value=5000, min_value=100, step=100)
+    # User inputs for simulation
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        initial_capital = st.number_input("Initial Capital (₹)", value=100000, step=10000)
+    with col2:
+        num_trades = st.number_input("Trades to Simulate", value=50, min_value=1, max_value=200)
+    with col3:
+        num_simulations = st.number_input("Number of Simulations", value=5000, min_value=100, step=500)
 
-    if st.button("Run Backtest"):
+    if st.button("🚀 Run Backtest & Monte Carlo", type="primary"):
         if not uploaded_file:
-            st.warning("Please upload a trade_history.csv file to run the backtest.")
+            st.warning("⚠️ Please upload a trade_history.csv file to run the backtest.")
             st.stop()
 
         try:
-            with st.spinner("Running backtest and Monte Carlo..."):
-                # Instantiate the class (pd.read_csv accepts Streamlit uploaded file object)
+            with st.spinner("Running backtest and Monte Carlo simulations..."):
+                # Instantiate the backtester
                 backtester = StrategyBacktester(uploaded_file)
 
-                # run backtest
+                # Run backtest
                 stats = backtester.backtest_options_trades()
                 if stats is None:
-                    st.error("Backtest returned no results — check uploaded CSV format and columns.")
+                    st.error("❌ Backtest returned no results — check uploaded CSV format and columns.")
                     st.stop()
 
-                # run Monte Carlo (use values from inputs)
+                # Run Monte Carlo
                 mc_results = backtester.monte_carlo_simulation(
                     initial_capital=int(initial_capital),
                     num_simulations=int(num_simulations),
                     num_trades=int(num_trades)
                 )
 
-                # create visualizations (returns a matplotlib figure)
+                # Create visualizations
                 fig = backtester.create_visualizations(mc_results)
 
-            # --- Display summary metrics ---
+            # Display summary metrics
+            st.success("✅ Analysis Complete!")
+            st.markdown("### 📊 Backtest Summary")
+            
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("Total Trades", stats['total_trades'])
             col2.metric("Win Rate", f"{stats['win_rate']:.1f}%")
             col3.metric("Profit Factor", f"{stats['profit_factor']:.2f}")
             col4.metric("Expectancy", f"₹{stats['expectancy']:.2f}")
+            
+            # Interpretation
+            st.markdown("### 🎯 Strategy Performance")
+            if stats['win_rate'] >= 60:
+                st.success(f"✅ Excellent win rate of {stats['win_rate']:.1f}%")
+            elif stats['win_rate'] >= 50:
+                st.warning(f"⚠️ Acceptable win rate of {stats['win_rate']:.1f}% - room for improvement")
+            else:
+                st.error(f"❌ Low win rate of {stats['win_rate']:.1f}% - strategy needs refinement")
+            
+            if stats['profit_factor'] > 2:
+                st.success(f"✅ Strong profit factor of {stats['profit_factor']:.2f}")
+            elif stats['profit_factor'] > 1:
+                st.warning(f"⚠️ Moderate profit factor of {stats['profit_factor']:.2f}")
+            else:
+                st.error(f"❌ Losing strategy - profit factor {stats['profit_factor']:.2f} < 1")
 
-            # show dataframe of individual trade results (if available)
-            st.markdown("### Backtest — per-trade results")
+            # Show per-trade results
+            st.markdown("### 📋 Individual Trade Results")
             if backtester.results is not None and not backtester.results.empty:
                 st.dataframe(backtester.results.reset_index(drop=True), use_container_width=True)
             else:
                 st.info("No per-trade results to display.")
 
-            # render the matplotlib figure produced by create_visualizations()
-            st.markdown("### Monte Carlo & Backtest Visualizations")
+            # Monte Carlo results
+            st.markdown("### 🎲 Monte Carlo Simulation Results")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Probability of Profit", f"{mc_results['prob_profit']:.1f}%")
+            col2.metric("Risk of Ruin", f"{mc_results['prob_ruin']:.1f}%")
+            col3.metric("Median Final Capital", f"₹{mc_results['median_final']:,.0f}")
+
+            # Render matplotlib figure
+            st.markdown("### 📈 Visualization Dashboard")
             st.pyplot(fig)
 
-            # optional: offer PNG download if create_visualizations saved it
+            # Download button
             try:
                 with open("backtest_analysis.png", "rb") as f:
-                    st.download_button("Download report PNG", f, file_name="backtest_analysis.png")
+                    st.download_button(
+                        "📥 Download Analysis Report (PNG)", 
+                        f, 
+                        file_name="backtest_analysis.png",
+                        mime="image/png"
+                    )
             except FileNotFoundError:
-                # file might not be present — that's fine
                 pass
 
         except Exception as e:
-            st.error("An error occurred while running the backtest.")
+            st.error("❌ An error occurred while running the backtest.")
             st.exception(e)
-
+            st.info("Please check that your CSV has the required columns: entry_date, exit_date, strategy, position_type, quantity, entry_price, exit_price")
 
 # ==================== SETTINGS PAGE ====================
 elif page == "⚙️ Settings":
     st.title("⚙️ Settings & Configuration")
     
     st.subheader("📁 Data Files")
-    st.info("Place your CSV files in the same folder as this app:")
-    st.code("holdings.csv - Your equity positions")
-    st.code("options_positions.csv - Your options positions")
+    st.info("**For Demo Mode:** This app uses sample data files")
+    st.code("sample_holdings.csv - Sample equity positions")
+    st.code("sample_options_positions.csv - Sample options positions")
+    st.code("sample_trade_history.csv - Sample trade history")
     
+    st.markdown("---")
+    st.subheader("📤 Upload Your Own Data")
+    st.markdown("To use your real portfolio data:")
+    st.markdown("1. Prepare CSV files with the same column structure as samples")
+    st.markdown("2. Replace 'sample_' prefix in code with your actual filenames")
+    st.markdown("3. Restart the app")
+    
+    st.markdown("---")
     st.subheader("🔄 Cache Settings")
     if st.button("Clear All Cache"):
         st.cache_data.clear()
-        st.success("Cache cleared! Data will refresh on next page load.")
+        st.success("✅ Cache cleared! Data will refresh on next page load.")
     
+    st.markdown("---")
     st.subheader("📊 About")
     st.markdown("""
-    **Portfolio Analytics Dashboard v1.0**
+    **Portfolio Analytics Dashboard v2.0**
     
     Built with:
-    - Python 3.x
-    - Streamlit
-    - yfinance
-    - Plotly
+    - Python 3.9+
+    - Streamlit 1.28+
+    - yfinance (real-time market data)
+    - Plotly (interactive charts)
+    - SciPy (options pricing & Monte Carlo)
     
     Features:
-    - ✅ Real-time equity tracking
-    - ✅ Options Greeks calculation
-    - ✅ Risk metrics analysis
-    - ✅ Interactive visualizations
+    - ✅ Real-time equity tracking with live NSE/BSE prices
+    - ✅ Options Greeks calculation (Black-Scholes model)
+    - ✅ Risk metrics analysis (Sharpe, VaR, Max Drawdown)
+    - ✅ Strategy backtesting with historical trades
+    - ✅ Monte Carlo simulations (10,000+ scenarios)
+    - ✅ Interactive visualizations with Plotly
+    
+    ---
+    
+    **Created by:** Pratyush Singh  
+    **GitHub:** [github.com/GoDkiLLeR-04/Trivya-portfolio-tracker](https://github.com/GoDkiLLeR-04/Trivya-portfolio-tracker)  
+    **License:** MIT  
     """)
+    
+    if BACKTEST_AVAILABLE:
+        st.success("✅ Backtesting module loaded successfully")
+    else:
+        st.warning("⚠️ Backtesting module not available")
 
 # Footer
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Built with ❤️ using Streamlit**")
+st.sidebar.markdown("v2.0 | [GitHub](https://github.com/GoDkiLLeR-04/Trivya-portfolio-tracker)")
