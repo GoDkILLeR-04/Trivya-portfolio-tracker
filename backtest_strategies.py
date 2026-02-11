@@ -288,120 +288,134 @@ class StrategyBacktester:
             'median_final': median_final
         }
     
-    def create_visualizations(self, mc_results=None):
+def create_visualizations(self, mc_results=None):
     """Generate backtest and Monte Carlo visualizations - STREAMLIT COMPATIBLE"""
-    print("\n" + "="*70)
-    print("GENERATING BACKTEST VISUALIZATIONS...")
-    print("="*70)
     
     if self.results is None:
         print("⚠ No backtest results to visualize")
-        return None  # Return None instead of nothing
+        return None
     
-    # IMPORTANT: Use plt.figure() instead of plt.subplots() for Streamlit
     import matplotlib
-    matplotlib.use('Agg')  # Use non-GUI backend
-    
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
     fig = plt.figure(figsize=(18, 12))
-    
-    # Create subplots manually
+
     ax1 = plt.subplot(2, 3, 1)
     ax2 = plt.subplot(2, 3, 2)
     ax3 = plt.subplot(2, 3, 3)
     ax4 = plt.subplot(2, 3, 4)
     ax5 = plt.subplot(2, 3, 5)
     ax6 = plt.subplot(2, 3, 6)
-    
-    fig.suptitle('Strategy Backtesting & Monte Carlo Analysis', 
-                 fontsize=16, fontweight='bold')
-    
+
+    fig.suptitle(
+        'Strategy Backtesting & Monte Carlo Analysis',
+        fontsize=16,
+        fontweight='bold'
+    )
+
     # 1. Cumulative P&L
     cumulative_pnl = self.results['pnl'].cumsum()
-    ax1.plot(cumulative_pnl.index, cumulative_pnl.values, linewidth=2, color='navy')
-    ax1.axhline(y=0, color='red', linestyle='--', alpha=0.5)
-    ax1.fill_between(cumulative_pnl.index, 0, cumulative_pnl.values,
-                     where=cumulative_pnl.values >= 0, alpha=0.3, color='green')
-    ax1.fill_between(cumulative_pnl.index, 0, cumulative_pnl.values,
-                     where=cumulative_pnl.values < 0, alpha=0.3, color='red')
+    ax1.plot(cumulative_pnl.index, cumulative_pnl.values, linewidth=2)
+    ax1.axhline(y=0, linestyle='--', alpha=0.5)
+    ax1.fill_between(
+        cumulative_pnl.index, 0, cumulative_pnl.values,
+        where=cumulative_pnl.values >= 0, alpha=0.3
+    )
+    ax1.fill_between(
+        cumulative_pnl.index, 0, cumulative_pnl.values,
+        where=cumulative_pnl.values < 0, alpha=0.3
+    )
     ax1.set_title('Cumulative P&L Over Time')
     ax1.set_xlabel('Trade Number')
     ax1.set_ylabel('Cumulative P&L (₹)')
     ax1.grid(alpha=0.3)
-    
+
     # 2. Win/Loss Distribution
     wins = self.results[self.results['pnl'] > 0]['pnl']
     losses = self.results[self.results['pnl'] < 0]['pnl']
-    
-    ax2.hist([wins, losses], bins=20, label=['Wins', 'Losses'],
-            color=['green', 'red'], alpha=0.7, edgecolor='black')
-    ax2.axvline(x=0, color='black', linestyle='-', linewidth=2)
+
+    ax2.hist([wins, losses], bins=20, alpha=0.7)
+    ax2.axvline(x=0, linewidth=2)
     ax2.set_title('P&L Distribution')
     ax2.set_xlabel('P&L (₹)')
     ax2.set_ylabel('Frequency')
-    ax2.legend()
     ax2.grid(alpha=0.3)
-    
+
     # 3. Returns by Strategy
     strategy_pnl = self.results.groupby('strategy')['pnl'].sum()
-    colors = ['green' if x > 0 else 'red' for x in strategy_pnl.values]
-    ax3.bar(range(len(strategy_pnl)), strategy_pnl.values, color=colors)
+    ax3.bar(range(len(strategy_pnl)), strategy_pnl.values)
     ax3.set_xticks(range(len(strategy_pnl)))
     ax3.set_xticklabels(strategy_pnl.index, rotation=45, ha='right')
     ax3.set_title('P&L by Strategy')
     ax3.set_ylabel('Total P&L (₹)')
-    ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+    ax3.axhline(y=0, linewidth=0.5)
     ax3.grid(axis='y', alpha=0.3)
-    
+
     # 4. Win Rate Over Time
-    rolling_win_rate = self.results['win'].rolling(window=10, min_periods=1).mean() * 100
-    ax4.plot(rolling_win_rate.index, rolling_win_rate.values, linewidth=2, color='purple')
-    ax4.axhline(y=50, color='orange', linestyle='--', label='Breakeven (50%)')
-    ax4.fill_between(rolling_win_rate.index, 50, rolling_win_rate.values,
-                     where=rolling_win_rate.values >= 50, alpha=0.3, color='green')
+    rolling_win_rate = (
+        self.results['win']
+        .rolling(window=10, min_periods=1)
+        .mean() * 100
+    )
+    ax4.plot(rolling_win_rate.index, rolling_win_rate.values, linewidth=2)
+    ax4.axhline(y=50, linestyle='--')
+    ax4.fill_between(
+        rolling_win_rate.index, 50, rolling_win_rate.values,
+        where=rolling_win_rate.values >= 50, alpha=0.3
+    )
     ax4.set_title('Rolling Win Rate (10-trade window)')
     ax4.set_xlabel('Trade Number')
     ax4.set_ylabel('Win Rate (%)')
-    ax4.legend()
     ax4.grid(alpha=0.3)
-    
+
     # 5. Monte Carlo Results
-    if mc_results:
-        ax5.hist(mc_results['final_capitals'], bins=50, edgecolor='black', alpha=0.7)
-        ax5.axvline(x=mc_results['median_final'], color='red', linestyle='--',
-                   linewidth=2, label=f"Median: ₹{mc_results['median_final']:,.0f}")
-        ax5.axvline(x=100000, color='orange', linestyle='--',
-                   linewidth=2, label='Initial Capital')
+    if mc_results is not None:
+        ax5.hist(mc_results.get('final_capitals', []), bins=50, alpha=0.7)
+        ax5.axvline(
+            x=mc_results.get('median_final', 0),
+            linestyle='--',
+            linewidth=2
+        )
         ax5.set_title('Monte Carlo: Final Capital Distribution')
         ax5.set_xlabel('Final Capital (₹)')
         ax5.set_ylabel('Frequency')
-        ax5.legend()
         ax5.grid(alpha=0.3)
     else:
-        ax5.text(0.5, 0.5, 'Run Monte Carlo\nSimulation First',
-                ha='center', va='center', fontsize=12, transform=ax5.transAxes)
+        ax5.text(
+            0.5, 0.5,
+            'Run Monte Carlo\nSimulation First',
+            ha='center', va='center',
+            transform=ax5.transAxes
+        )
         ax5.set_title('Monte Carlo Results')
-    
+
     # 6. Drawdown Analysis
-    if mc_results:
-        ax6.hist(mc_results['max_drawdowns'] * 100, bins=50, 
-                edgecolor='black', alpha=0.7, color='coral')
+    if mc_results is not None:
+        drawdowns = mc_results.get('max_drawdowns', [])
+        ax6.hist(
+            [d * 100 for d in drawdowns],
+            bins=50,
+            alpha=0.7
+        )
         ax6.set_title('Monte Carlo: Maximum Drawdown Distribution')
         ax6.set_xlabel('Max Drawdown (%)')
         ax6.set_ylabel('Frequency')
         ax6.grid(alpha=0.3)
     else:
-        ax6.text(0.5, 0.5, 'Run Monte Carlo\nSimulation First',
-                ha='center', va='center', fontsize=12, transform=ax6.transAxes)
+        ax6.text(
+            0.5, 0.5,
+            'Run Monte Carlo\nSimulation First',
+            ha='center', va='center',
+            transform=ax6.transAxes
+        )
         ax6.set_title('Drawdown Analysis')
-    
+
     plt.tight_layout()
-    
-    # Save the figure
     plt.savefig('backtest_analysis.png', dpi=300, bbox_inches='tight')
-    print("✓ Saved: backtest_analysis.png")
-    
-    return fig  # IMPORTANT: Return the figure object
-    
+
+    return fig
+  
     def generate_report(self, initial_capital=100000):
         """Generate complete backtesting report"""
         print("\n" + "="*80)
@@ -441,17 +455,17 @@ class StrategyBacktester:
 
 # Main execution
 if __name__ == "__main__":
-   print(" "*20 + "STRATEGY BACKTESTING & MONTE CARLO SYSTEM")
-   print(" "*30 + "Options Trading Analysis")
-   print("="*80)
+    print(" "*20 + "STRATEGY BACKTESTING & MONTE CARLO SYSTEM")
+    print(" "*30 + "Options Trading Analysis")
+    print("="*80)
     
     # Initialize backtester
     # If you have historical trades CSV, pass it here
     # Otherwise, it will use sample data for Monte Carlo
-      backtester = StrategyBacktester('trade_history.csv')
+    backtester = StrategyBacktester('trade_history.csv')
     
     # Generate complete report
-      backtester.generate_report(initial_capital=100000)
+    backtester.generate_report(initial_capital=100000)
     
-    Show plots
+    # Show plots
     plt.show()
