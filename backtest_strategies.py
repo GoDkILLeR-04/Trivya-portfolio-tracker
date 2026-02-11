@@ -288,124 +288,109 @@ class StrategyBacktester:
             'median_final': median_final
         }
     
-class StrategyBacktester:
-
-    def __init__(self, trades_csv=None):
-        self.results = None
-
-        if trades_csv is not None:
-            self.load_trades(trades_csv)
-
-    # ---------------------------------
-    # LOAD TRADES
-    # ---------------------------------
-    def load_trades(self, trades_csv):
-
-        df = pd.read_csv(trades_csv)
-
-        df.columns = df.columns.str.strip().str.lower()
-
-        # Auto detect pnl column
-        if "pnl" not in df.columns:
-            if "profit" in df.columns:
-                df["pnl"] = df["profit"]
-            elif "p&l" in df.columns:
-                df["pnl"] = df["p&l"]
-            elif "net_pnl" in df.columns:
-                df["pnl"] = df["net_pnl"]
-            else:
-                raise ValueError(
-                    f"No PnL column found. Columns available: {df.columns.tolist()}"
-                )
-
-        if "strategy" not in df.columns:
-            df["strategy"] = "Strategy_1"
-
-        df["win"] = df["pnl"] > 0
-
-        self.results = df
-
-    # ---------------------------------
-    # BACKTEST
-    # ---------------------------------
-    def run_backtest(self):
-        return self.results
-
-    # ---------------------------------
-    # MONTE CARLO
-    # ---------------------------------
-    def run_monte_carlo(self, simulations=1000, initial_capital=100000):
-
-        if self.results is None:
-            return None
-
-        returns = self.results["pnl"].values
-        final_capitals = []
-        max_drawdowns = []
-
-        for _ in range(simulations):
-            sampled = np.random.choice(returns, size=len(returns), replace=True)
-
-            equity = initial_capital + np.cumsum(sampled)
-            final_capitals.append(equity[-1])
-
-            peak = np.maximum.accumulate(equity)
-            dd = (equity - peak) / peak
-            max_drawdowns.append(dd.min())
-
-        return {
-            "final_capitals": final_capitals,
-            "median_final": np.median(final_capitals),
-            "max_drawdowns": max_drawdowns,
-        }
-
-    # ---------------------------------
-    # VISUALIZATION
-    # ---------------------------------
     def create_visualizations(self, mc_results=None):
-
+        """Generate backtest and Monte Carlo visualizations"""
+        print("\n" + "="*70)
+        print("GENERATING BACKTEST VISUALIZATIONS...")
+        print("="*70)
+        
         if self.results is None:
-            return None
-
-        fig = plt.figure(figsize=(18, 12))
-
-        ax1 = plt.subplot(2, 3, 1)
-        ax2 = plt.subplot(2, 3, 2)
-        ax3 = plt.subplot(2, 3, 3)
-        ax4 = plt.subplot(2, 3, 4)
-        ax5 = plt.subplot(2, 3, 5)
-        ax6 = plt.subplot(2, 3, 6)
-
-        cumulative = self.results["pnl"].cumsum()
-        ax1.plot(cumulative)
-        ax1.set_title("Cumulative PnL")
-
-        wins = self.results[self.results["pnl"] > 0]["pnl"]
-        losses = self.results[self.results["pnl"] < 0]["pnl"]
-        ax2.hist([wins, losses], bins=20)
-        ax2.set_title("Win / Loss Distribution")
-
-        strat = self.results.groupby("strategy")["pnl"].sum()
-        ax3.bar(strat.index, strat.values)
-        ax3.set_title("PnL by Strategy")
-        ax3.tick_params(axis="x", rotation=45)
-
-        rolling = self.results["win"].rolling(10, min_periods=1).mean() * 100
-        ax4.plot(rolling)
-        ax4.set_title("Rolling Win Rate")
-
-        if mc_results is not None:
-            ax5.hist(mc_results["final_capitals"], bins=40)
-            ax5.axvline(mc_results["median_final"], linestyle="--")
-            ax5.set_title("Monte Carlo Final Capital")
-
-            ax6.hist(np.array(mc_results["max_drawdowns"]) * 100, bins=40)
-            ax6.set_title("Max Drawdown %")
+            print("⚠ No backtest results to visualize")
+            return
+        
+        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+        fig.suptitle('Strategy Backtesting & Monte Carlo Analysis', 
+                     fontsize=16, fontweight='bold')
+        
+        # 1. Cumulative P&L
+        ax1 = axes[0, 0]
+        cumulative_pnl = self.results['pnl'].cumsum()
+        ax1.plot(cumulative_pnl.index, cumulative_pnl.values, linewidth=2, color='navy')
+        ax1.axhline(y=0, color='red', linestyle='--', alpha=0.5)
+        ax1.fill_between(cumulative_pnl.index, 0, cumulative_pnl.values,
+                         where=cumulative_pnl.values >= 0, alpha=0.3, color='green')
+        ax1.fill_between(cumulative_pnl.index, 0, cumulative_pnl.values,
+                         where=cumulative_pnl.values < 0, alpha=0.3, color='red')
+        ax1.set_title('Cumulative P&L Over Time')
+        ax1.set_xlabel('Trade Number')
+        ax1.set_ylabel('Cumulative P&L (₹)')
+        ax1.grid(alpha=0.3)
+        
+        # 2. Win/Loss Distribution
+        ax2 = axes[0, 1]
+        wins = self.results[self.results['pnl'] > 0]['pnl']
+        losses = self.results[self.results['pnl'] < 0]['pnl']
+        
+        ax2.hist([wins, losses], bins=20, label=['Wins', 'Losses'],
+                color=['green', 'red'], alpha=0.7, edgecolor='black')
+        ax2.axvline(x=0, color='black', linestyle='-', linewidth=2)
+        ax2.set_title('P&L Distribution')
+        ax2.set_xlabel('P&L (₹)')
+        ax2.set_ylabel('Frequency')
+        ax2.legend()
+        ax2.grid(alpha=0.3)
+        
+        # 3. Returns by Strategy
+        ax3 = axes[0, 2]
+        strategy_pnl = self.results.groupby('strategy')['pnl'].sum()
+        colors = ['green' if x > 0 else 'red' for x in strategy_pnl.values]
+        ax3.bar(range(len(strategy_pnl)), strategy_pnl.values, color=colors)
+        ax3.set_xticks(range(len(strategy_pnl)))
+        ax3.set_xticklabels(strategy_pnl.index, rotation=45, ha='right')
+        ax3.set_title('P&L by Strategy')
+        ax3.set_ylabel('Total P&L (₹)')
+        ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+        ax3.grid(axis='y', alpha=0.3)
+        
+        # 4. Win Rate Over Time
+        ax4 = axes[1, 0]
+        rolling_win_rate = self.results['win'].rolling(window=10, min_periods=1).mean() * 100
+        ax4.plot(rolling_win_rate.index, rolling_win_rate.values, linewidth=2, color='purple')
+        ax4.axhline(y=50, color='orange', linestyle='--', label='Breakeven (50%)')
+        ax4.fill_between(rolling_win_rate.index, 50, rolling_win_rate.values,
+                         where=rolling_win_rate.values >= 50, alpha=0.3, color='green')
+        ax4.set_title('Rolling Win Rate (10-trade window)')
+        ax4.set_xlabel('Trade Number')
+        ax4.set_ylabel('Win Rate (%)')
+        ax4.legend()
+        ax4.grid(alpha=0.3)
+        
+        # 5. Monte Carlo Results
+        ax5 = axes[1, 1]
+        if mc_results:
+            ax5.hist(mc_results['final_capitals'], bins=50, edgecolor='black', alpha=0.7)
+            ax5.axvline(x=mc_results['median_final'], color='red', linestyle='--',
+                       linewidth=2, label=f"Median: ₹{mc_results['median_final']:,.0f}")
+            ax5.axvline(x=100000, color='orange', linestyle='--',
+                       linewidth=2, label='Initial Capital')
+            ax5.set_title('Monte Carlo: Final Capital Distribution')
+            ax5.set_xlabel('Final Capital (₹)')
+            ax5.set_ylabel('Frequency')
+            ax5.legend()
+            ax5.grid(alpha=0.3)
         else:
-            ax5.text(0.5, 0.5, "Run Monte Carlo", ha="center", va="center")
-            ax6.text(0.5, 0.5, "Run Monte Carlo", ha="center", va="center")
-
+            ax5.text(0.5, 0.5, 'Run Monte Carlo\nSimulation First',
+                    ha='center', va='center', fontsize=12)
+            ax5.set_title('Monte Carlo Results')
+        
+        # 6. Drawdown Analysis
+        ax6 = axes[1, 2]
+        if mc_results:
+            ax6.hist(mc_results['max_drawdowns'] * 100, bins=50, 
+                    edgecolor='black', alpha=0.7, color='coral')
+            ax6.set_title('Monte Carlo: Maximum Drawdown Distribution')
+            ax6.set_xlabel('Max Drawdown (%)')
+            ax6.set_ylabel('Frequency')
+            ax6.grid(alpha=0.3)
+        else:
+            ax6.text(0.5, 0.5, 'Run Monte Carlo\nSimulation First',
+                    ha='center', va='center', fontsize=12)
+            ax6.set_title('Drawdown Analysis')
+        
         plt.tight_layout()
+        plt.savefig('backtest_analysis.png', dpi=300, bbox_inches='tight')
+        print("✓ Saved: backtest_analysis.png")
+        
         return fig
     
     def generate_report(self, initial_capital=100000):
