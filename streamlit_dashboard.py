@@ -12,7 +12,11 @@ warnings.filterwarnings('ignore')
 
 # Try to import StrategyBacktester - with proper error handling
 try:
+   try:
     from backtest_strategies import StrategyBacktester
+    BACKTEST_AVAILABLE = True
+except ImportError:
+    BACKTEST_AVAILABLE = False
     BACKTEST_AVAILABLE = True
 except ImportError:
     BACKTEST_AVAILABLE = False
@@ -52,9 +56,11 @@ if not BACKTEST_AVAILABLE:
     st.sidebar.warning("⚠️ **Backtesting Unavailable**\n\nMake sure `backtest_strategies.py` is in the same folder!")
 
 page = st.sidebar.radio(
-    "Navigate to:",
-    ["🏠 Overview", "📈 Equity Analysis", "📉 Options Analysis", "📊 Strategy Backtesting", "⚙️ Settings"]
-)
+    pages = ["🏠 Overview", "📈 Equity Analysis", "📉 Options Analysis", "⚙️ Settings"]
+if BACKTEST_AVAILABLE:
+    pages.insert(3, "📊 Strategy Backtesting")
+
+page = st.sidebar.radio("Navigate to:", pages)
 
 # Load data functions
 @st.cache_data(ttl=300)  # Cache for 5 minutes
