@@ -432,17 +432,10 @@ class StrategyBacktester:
 
 # Main execution
 if __name__ == "__main__":
-    print(" "*20 + "STRATEGY BACKTESTING & MONTE CARLO SYSTEM")
-    print(" "*30 + "Options Trading Analysis")
-    print("="*80)
-    
-    # Initialize backtester
-    # If you have historical trades CSV, pass it here
-    # Otherwise, it will use sample data for Monte Carlo
-    backtester = StrategyBacktester('trade_history.csv')
-    
-    # Generate complete report
+
+    backtester = StrategyBacktester("trade_history.csv")
+
     backtester.generate_report(initial_capital=100000)
-    
-    # Show plots
+
     plt.show()
+
