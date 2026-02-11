@@ -287,38 +287,53 @@ class StrategyBacktester:
             'prob_ruin': prob_ruin,
             'median_final': median_final
         }
+    
 class StrategyBacktester:
 
     def __init__(self, trades_csv=None):
         self.results = None
-        
-        if trades_csv:
+
+        if trades_csv is not None:
             self.load_trades(trades_csv)
 
-    # -----------------------------
-    # Load Trades
-    # -----------------------------
+    # ---------------------------------
+    # LOAD TRADES
+    # ---------------------------------
     def load_trades(self, trades_csv):
+
         df = pd.read_csv(trades_csv)
 
-        # Required columns: pnl, strategy
+        df.columns = df.columns.str.strip().str.lower()
+
+        # Auto detect pnl column
+        if "pnl" not in df.columns:
+            if "profit" in df.columns:
+                df["pnl"] = df["profit"]
+            elif "p&l" in df.columns:
+                df["pnl"] = df["p&l"]
+            elif "net_pnl" in df.columns:
+                df["pnl"] = df["net_pnl"]
+            else:
+                raise ValueError(
+                    f"No PnL column found. Columns available: {df.columns.tolist()}"
+                )
+
+        if "strategy" not in df.columns:
+            df["strategy"] = "Strategy_1"
+
         df["win"] = df["pnl"] > 0
+
         self.results = df
 
-    # -----------------------------
-    # Run Backtest
-    # -----------------------------
+    # ---------------------------------
+    # BACKTEST
+    # ---------------------------------
     def run_backtest(self):
-        if self.results is None:
-            print("No trades loaded.")
-            return
-        
-        print("Backtest complete.")
         return self.results
 
-    # -----------------------------
-    # Monte Carlo Simulation
-    # -----------------------------
+    # ---------------------------------
+    # MONTE CARLO
+    # ---------------------------------
     def run_monte_carlo(self, simulations=1000, initial_capital=100000):
 
         if self.results is None:
@@ -329,24 +344,24 @@ class StrategyBacktester:
         max_drawdowns = []
 
         for _ in range(simulations):
-            sampled_returns = np.random.choice(returns, size=len(returns), replace=True)
+            sampled = np.random.choice(returns, size=len(returns), replace=True)
 
-            equity = initial_capital + np.cumsum(sampled_returns)
+            equity = initial_capital + np.cumsum(sampled)
             final_capitals.append(equity[-1])
 
             peak = np.maximum.accumulate(equity)
-            drawdown = (equity - peak) / peak
-            max_drawdowns.append(drawdown.min())
+            dd = (equity - peak) / peak
+            max_drawdowns.append(dd.min())
 
         return {
             "final_capitals": final_capitals,
             "median_final": np.median(final_capitals),
-            "max_drawdowns": max_drawdowns
+            "max_drawdowns": max_drawdowns,
         }
 
-    # -----------------------------
-    # Visualizations
-    # -----------------------------
+    # ---------------------------------
+    # VISUALIZATION
+    # ---------------------------------
     def create_visualizations(self, mc_results=None):
 
         if self.results is None:
@@ -361,48 +376,34 @@ class StrategyBacktester:
         ax5 = plt.subplot(2, 3, 5)
         ax6 = plt.subplot(2, 3, 6)
 
-        fig.suptitle("Strategy Backtesting & Monte Carlo Analysis",
-                     fontsize=16, fontweight="bold")
+        cumulative = self.results["pnl"].cumsum()
+        ax1.plot(cumulative)
+        ax1.set_title("Cumulative PnL")
 
-        # 1. Cumulative P&L
-        cumulative_pnl = self.results["pnl"].cumsum()
-        ax1.plot(cumulative_pnl.index, cumulative_pnl.values)
-        ax1.axhline(0)
-        ax1.set_title("Cumulative P&L")
-
-        # 2. Win/Loss Distribution
         wins = self.results[self.results["pnl"] > 0]["pnl"]
         losses = self.results[self.results["pnl"] < 0]["pnl"]
         ax2.hist([wins, losses], bins=20)
-        ax2.set_title("Win/Loss Distribution")
+        ax2.set_title("Win / Loss Distribution")
 
-        # 3. P&L by Strategy
-        strategy_pnl = self.results.groupby("strategy")["pnl"].sum()
-        ax3.bar(strategy_pnl.index, strategy_pnl.values)
-        ax3.set_title("P&L by Strategy")
+        strat = self.results.groupby("strategy")["pnl"].sum()
+        ax3.bar(strat.index, strat.values)
+        ax3.set_title("PnL by Strategy")
         ax3.tick_params(axis="x", rotation=45)
 
-        # 4. Rolling Win Rate
-        rolling_win = self.results["win"].rolling(10, min_periods=1).mean() * 100
-        ax4.plot(rolling_win.index, rolling_win.values)
+        rolling = self.results["win"].rolling(10, min_periods=1).mean() * 100
+        ax4.plot(rolling)
         ax4.set_title("Rolling Win Rate")
 
-        # 5. Monte Carlo Final Capital
         if mc_results is not None:
             ax5.hist(mc_results["final_capitals"], bins=40)
             ax5.axvline(mc_results["median_final"], linestyle="--")
             ax5.set_title("Monte Carlo Final Capital")
-        else:
-            ax5.text(0.5, 0.5, "Run Monte Carlo First",
-                     ha="center", va="center", transform=ax5.transAxes)
 
-        # 6. Monte Carlo Drawdown
-        if mc_results is not None:
             ax6.hist(np.array(mc_results["max_drawdowns"]) * 100, bins=40)
-            ax6.set_title("Max Drawdown Distribution")
+            ax6.set_title("Max Drawdown %")
         else:
-            ax6.text(0.5, 0.5, "Run Monte Carlo First",
-                     ha="center", va="center", transform=ax6.transAxes)
+            ax5.text(0.5, 0.5, "Run Monte Carlo", ha="center", va="center")
+            ax6.text(0.5, 0.5, "Run Monte Carlo", ha="center", va="center")
 
         plt.tight_layout()
         return fig
