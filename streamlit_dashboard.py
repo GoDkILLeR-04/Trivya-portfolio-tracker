@@ -1,6 +1,6 @@
 """
-Trivya Portfolio Tracker - Unified Dashboard
-Showcases: Portfolio Analytics + Options Greeks + Strategy Backtesting
+Trivya Portfolio Tracker - Complete Unified Dashboard
+Portfolio Analytics + Options Greeks + Strategy Backtesting + Portfolio Monte Carlo
 """
 
 import streamlit as st
@@ -49,18 +49,19 @@ st.markdown("""
 st.sidebar.title("📊 Trivya Portfolio Tracker")
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
-**All-in-One Portfolio Analytics**
+**Complete Portfolio Analytics Suite**
 
-Three powerful tools combined:
+Four powerful tools:
 - 📈 Equity Portfolio Tracker
+- 🎲 Portfolio Monte Carlo
 - 📉 Options Greeks Calculator  
-- 🎲 Strategy Backtesting
+- 📊 Strategy Backtesting
 """)
 st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Select Tool:",
-    ["🏠 Home", "📈 Portfolio Tracker", "📉 Options Tracker", "🎲 Strategy Backtesting"]
+    ["🏠 Home", "📈 Portfolio Tracker", "🎲 Portfolio Monte Carlo", "📉 Options Tracker", "📊 Strategy Backtesting"]
 )
 
 # Data loading functions
@@ -135,105 +136,187 @@ def black_scholes_greeks(S, K, T, r, sigma, option_type):
     
     return {'price': price, 'delta': delta, 'gamma': gamma, 'theta': theta, 'vega': vega}
 
+def run_portfolio_monte_carlo(holdings_df, num_simulations=10000, time_horizon_months=12):
+    """
+    Monte Carlo simulation for equity portfolio projections
+    """
+    # Get historical data for all stocks
+    symbols = holdings_df['symbol'].unique().tolist()
+    symbols_str = ' '.join(symbols)
+    
+    # Download 1 year of historical data
+    hist_data = yf.download(symbols_str, period="1y", progress=False)['Close']
+    if isinstance(hist_data, pd.Series):
+        hist_data = hist_data.to_frame()
+        hist_data.columns = [symbols[0]]
+    
+    # Calculate daily returns
+    returns = hist_data.pct_change().dropna()
+    
+    # Calculate portfolio statistics
+    mean_returns = returns.mean()
+    cov_matrix = returns.cov()
+    
+    # Current portfolio weights
+    symbol_allocation = holdings_df.groupby('symbol')['current_value'].sum()
+    total_value = symbol_allocation.sum()
+    weights = symbol_allocation / total_value
+    weights = weights.reindex(returns.columns, fill_value=0)
+    
+    # Portfolio expected return and volatility
+    portfolio_return = np.dot(weights.values, mean_returns.values)
+    portfolio_volatility = np.sqrt(np.dot(weights.values.T, np.dot(cov_matrix.values, weights.values)))
+    
+    # Run Monte Carlo simulation
+    num_days = time_horizon_months * 21  # Trading days
+    final_values = []
+    
+    for _ in range(num_simulations):
+        daily_returns = np.random.normal(portfolio_return, portfolio_volatility, num_days)
+        portfolio_path = total_value * np.cumprod(1 + daily_returns)
+        final_values.append(portfolio_path[-1])
+    
+    final_values = np.array(final_values)
+    
+    return {
+        'current_value': total_value,
+        'final_values': final_values,
+        'mean_final': np.mean(final_values),
+        'median_final': np.median(final_values),
+        'percentile_5': np.percentile(final_values, 5),
+        'percentile_25': np.percentile(final_values, 25),
+        'percentile_75': np.percentile(final_values, 75),
+        'percentile_95': np.percentile(final_values, 95),
+        'prob_profit': (final_values > total_value).sum() / num_simulations * 100,
+        'prob_loss': (final_values < total_value).sum() / num_simulations * 100,
+        'expected_return': (np.mean(final_values) - total_value) / total_value * 100
+    }
+
 # ==================== HOME PAGE ====================
 if page == "🏠 Home":
     st.title("📊 Trivya Portfolio Tracker")
-    st.markdown("### Professional Portfolio Analytics for Indian Markets")
+    st.markdown("### Professional Portfolio Analytics for Indian Markets (NSE/BSE)")
     
     st.markdown("---")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("### 📈 Portfolio Tracker")
         st.markdown("""
-        **Features:**
-        - Real-time NSE/BSE prices
+        **Real-time equity tracking**
+        - Live NSE/BSE prices
         - Multi-position tracking
         - Risk metrics (Sharpe, VaR, Drawdown)
         - Portfolio allocation charts
-        - Performance analytics
+        - Best/worst performers
         
         **Output:**
-        - Current portfolio value & P&L
-        - Best/worst performers
+        - Current value & P&L
         - Risk-adjusted returns
-        - Historical performance graphs
+        - Performance analytics
+        """)
+        
+        st.markdown("### 🎲 Portfolio Monte Carlo")
+        st.markdown("""
+        **Future portfolio projections**
+        - 10,000+ scenario simulations
+        - 12-month projections
+        - Probability distributions
+        - Expected returns
+        - Downside risk analysis
+        
+        **Output:**
+        - Probability of profit
+        - Expected portfolio value
+        - Risk scenarios (best/worst case)
         """)
     
     with col2:
         st.markdown("### 📉 Options Tracker")
         st.markdown("""
-        **Features:**
+        **Options Greeks & P&L**
         - Real-time Greeks calculation
         - Black-Scholes pricing
-        - Portfolio Greeks aggregation
-        - Strategy P&L tracking
+        - Portfolio aggregation
+        - Strategy tracking
         - Time decay monitoring
         
         **Output:**
-        - Portfolio Delta, Gamma, Theta, Vega
-        - Current options prices
-        - P&L by strategy
-        - Days to expiry tracking
+        - Delta, Gamma, Theta, Vega
+        - Current prices & P&L
+        - Strategy-wise breakdown
         """)
-    
-    with col3:
-        st.markdown("### 🎲 Strategy Backtesting")
+        
+        st.markdown("### 📊 Strategy Backtesting")
         st.markdown("""
-        **Features:**
-        - Historical trade analysis
+        **Historical trade analysis**
         - Win rate & profit factor
-        - Monte Carlo simulations (10k+)
+        - Monte Carlo simulations
         - Strategy comparison
         - Risk projections
         
         **Output:**
         - Backtest metrics
-        - Probability of profit
         - Expected returns
-        - 6-panel visualization dashboard
+        - 6-panel visualization
         """)
     
     st.markdown("---")
     
-    st.markdown("### 🎯 The Edge")
-    st.info("""
-    **What makes this special:**
+    st.markdown("### 🎯 The Edge - What Makes This Special")
     
-    ✅ **All-in-One**: Equity + Options + Backtesting in one place
+    col1, col2 = st.columns(2)
     
-    ✅ **Real-time Data**: Live NSE/BSE prices via yfinance
+    with col1:
+        st.success("""
+        **Comprehensive Coverage**
+        
+        ✅ Equity + Options + Backtesting in one place
+        
+        ✅ Both current tracking AND future projections
+        
+        ✅ Real portfolio data, real calculations
+        """)
     
-    ✅ **Institutional Metrics**: Sharpe Ratio, Beta, VaR, Greeks
-    
-    ✅ **Predictive Analytics**: Monte Carlo simulations with 10,000+ scenarios
-    
-    ✅ **Indian Markets**: Specifically built for NSE/BSE with INR formatting
-    
-    ✅ **Professional Output**: Publication-ready charts and reports
-    """)
+    with col2:
+        st.info("""
+        **Professional Analytics**
+        
+        📊 Institutional-grade risk metrics
+        
+        🎲 Monte Carlo simulations (10k+ scenarios)
+        
+        📈 Built specifically for Indian markets
+        """)
     
     st.markdown("---")
     
     st.markdown("### 🚀 Tech Stack")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.markdown("""
-        **Data & Analytics:**
-        - `yfinance` - Real-time market data
-        - `pandas` - Data manipulation
-        - `numpy` - Numerical computing
-        - `scipy` - Statistical functions
+        **Data & Market**
+        - `yfinance` - NSE/BSE data
+        - Real-time price feeds
+        - Historical data analysis
         """)
     
     with col2:
         st.markdown("""
-        **Visualization:**
-        - `matplotlib` - Static charts
-        - `plotly` - Interactive graphs
-        - `streamlit` - Web dashboard
+        **Analytics Engine**
+        - `numpy` - Calculations
+        - `scipy` - Statistics
+        - `pandas` - Data processing
+        """)
+    
+    with col3:
+        st.markdown("""
+        **Visualization**
+        - `plotly` - Interactive charts
+        - `matplotlib` - Reports
+        - `streamlit` - Dashboard
         """)
     
     st.markdown("---")
@@ -243,7 +326,7 @@ if page == "🏠 Home":
 # ==================== PORTFOLIO TRACKER ====================
 elif page == "📈 Portfolio Tracker":
     st.title("📈 Equity Portfolio Tracker")
-    st.markdown("*Real-time tracking with risk analytics and performance metrics*")
+    st.markdown("*Real-time tracking with risk analytics*")
     
     equity_holdings = load_equity_holdings()
     
@@ -364,14 +447,143 @@ elif page == "📈 Portfolio Tracker":
     if sharpe > 1:
         st.success("✓ Excellent risk-adjusted returns (Sharpe > 1)")
     elif sharpe > 0:
-        st.warning("⚠ Positive returns but moderate efficiency (Sharpe > 0)")
+        st.warning("⚠ Positive returns but moderate efficiency")
     else:
-        st.error("✗ Returns below risk-free rate (Sharpe < 0)")
+        st.error("✗ Returns below risk-free rate")
+
+# ==================== PORTFOLIO MONTE CARLO ====================
+elif page == "🎲 Portfolio Monte Carlo":
+    st.title("🎲 Portfolio Monte Carlo Projection")
+    st.markdown("*Simulate 10,000+ scenarios to project your portfolio's future performance*")
+    
+    equity_holdings = load_equity_holdings()
+    
+    if equity_holdings.empty:
+        st.error("No equity data found. Please add holdings.csv")
+        st.stop()
+    
+    with st.spinner("Fetching current prices..."):
+        symbols = equity_holdings['symbol'].unique().tolist()
+        prices = fetch_current_prices(symbols)
+        equity_holdings = calculate_equity_metrics(equity_holdings, prices)
+    
+    current_value = equity_holdings['current_value'].sum()
+    
+    st.markdown("### ⚙️ Simulation Parameters")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        num_simulations = st.number_input("Number of Simulations", value=10000, min_value=1000, step=1000)
+    with col2:
+        time_horizon = st.number_input("Time Horizon (months)", value=12, min_value=1, max_value=60)
+    
+    if st.button("🚀 Run Monte Carlo Simulation", type="primary"):
+        with st.spinner(f"Running {num_simulations:,} simulations... This may take a moment"):
+            mc_results = run_portfolio_monte_carlo(equity_holdings, num_simulations, time_horizon)
+        
+        st.success("✅ Simulation Complete!")
+        
+        st.markdown("---")
+        
+        # Key metrics
+        st.markdown("### 📊 Projection Results")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Current Value", f"₹{mc_results['current_value']:,.0f}")
+        col2.metric("Expected Value", f"₹{mc_results['mean_final']:,.0f}", 
+                   f"{mc_results['expected_return']:+.2f}%")
+        col3.metric("Median Value", f"₹{mc_results['median_final']:,.0f}")
+        col4.metric("Prob of Profit", f"{mc_results['prob_profit']:.1f}%")
+        
+        st.markdown("---")
+        
+        # Confidence intervals
+        st.markdown("### 📈 Confidence Intervals")
+        col1, col2, col3 = st.columns(3)
+        
+        col1.metric("95th Percentile", f"₹{mc_results['percentile_95']:,.0f}", 
+                   "Best 5% outcome")
+        col2.metric("50th Percentile", f"₹{mc_results['median_final']:,.0f}",
+                   "Median outcome")
+        col3.metric("5th Percentile", f"₹{mc_results['percentile_5']:,.0f}",
+                   "Worst 5% outcome")
+        
+        st.markdown("---")
+        
+        # Interpretation
+        st.markdown("### 🎯 Interpretation")
+        
+        if mc_results['prob_profit'] > 70:
+            st.success(f"✅ **Strong Outlook**: {mc_results['prob_profit']:.1f}% probability of profit after {time_horizon} months")
+        elif mc_results['prob_profit'] > 50:
+            st.warning(f"⚠️ **Moderate Outlook**: {mc_results['prob_profit']:.1f}% probability of profit")
+        else:
+            st.error(f"❌ **Weak Outlook**: Only {mc_results['prob_profit']:.1f}% probability of profit")
+        
+        expected_gain = mc_results['mean_final'] - mc_results['current_value']
+        st.info(f"""
+        **Expected Outcome**: Your ₹{mc_results['current_value']:,.0f} portfolio is projected to be worth 
+        ₹{mc_results['mean_final']:,.0f} in {time_horizon} months, a potential gain of ₹{expected_gain:,.0f} 
+        ({mc_results['expected_return']:+.2f}%).
+        """)
+        
+        st.markdown("---")
+        
+        # Distribution chart
+        st.markdown("### 📊 Value Distribution")
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Histogram(
+            x=mc_results['final_values'],
+            nbinsx=50,
+            name='Possible Outcomes',
+            marker_color='lightblue',
+            opacity=0.7
+        ))
+        
+        fig.add_vline(x=mc_results['current_value'], line_dash="dash", line_color="orange",
+                     annotation_text="Current Value", annotation_position="top left")
+        fig.add_vline(x=mc_results['median_final'], line_dash="dash", line_color="green",
+                     annotation_text="Median Projection", annotation_position="top right")
+        
+        fig.update_layout(
+            title=f'Distribution of Portfolio Value After {time_horizon} Months',
+            xaxis_title='Portfolio Value (₹)',
+            yaxis_title='Frequency',
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Risk table
+        st.markdown("### ⚠️ Risk Scenarios")
+        
+        scenarios = pd.DataFrame({
+            'Scenario': ['Best Case (95th %ile)', 'Likely (75th %ile)', 'Expected (Median)', 
+                        'Conservative (25th %ile)', 'Worst Case (5th %ile)'],
+            'Portfolio Value': [
+                f"₹{mc_results['percentile_95']:,.0f}",
+                f"₹{mc_results['percentile_75']:,.0f}",
+                f"₹{mc_results['median_final']:,.0f}",
+                f"₹{mc_results['percentile_25']:,.0f}",
+                f"₹{mc_results['percentile_5']:,.0f}"
+            ],
+            'Return %': [
+                f"{(mc_results['percentile_95'] - mc_results['current_value']) / mc_results['current_value'] * 100:+.2f}%",
+                f"{(mc_results['percentile_75'] - mc_results['current_value']) / mc_results['current_value'] * 100:+.2f}%",
+                f"{(mc_results['median_final'] - mc_results['current_value']) / mc_results['current_value'] * 100:+.2f}%",
+                f"{(mc_results['percentile_25'] - mc_results['current_value']) / mc_results['current_value'] * 100:+.2f}%",
+                f"{(mc_results['percentile_5'] - mc_results['current_value']) / mc_results['current_value'] * 100:+.2f}%"
+            ]
+        })
+        
+        st.dataframe(scenarios, use_container_width=True, hide_index=True)
 
 # ==================== OPTIONS TRACKER ====================
 elif page == "📉 Options Tracker":
     st.title("📉 Options Portfolio Tracker")
-    st.markdown("*Real-time Greeks calculation and options P&L tracking*")
+    st.markdown("*Real-time Greeks calculation and P&L tracking*")
     
     options_df = load_options_positions()
     
@@ -431,28 +643,11 @@ elif page == "📉 Options Tracker":
         fig = px.bar(strategy_pnl, x='strategy', y='pnl', title='P&L by Strategy',
                     color='pnl', color_continuous_scale='RdYlGn')
         st.plotly_chart(fig, use_container_width=True)
-    
-    # Greeks explanation
-    with st.expander("📚 Understanding Greeks"):
-        st.markdown("""
-        **Delta**: Rate of change of option price relative to underlying price
-        - Call Delta: 0 to 1 | Put Delta: -1 to 0
-        
-        **Gamma**: Rate of change of Delta
-        - Higher Gamma = More risk near expiry
-        
-        **Theta**: Time decay per day
-        - Negative for long positions (you lose daily)
-        - Positive for short positions (you gain daily)
-        
-        **Vega**: Sensitivity to volatility changes
-        - Long options benefit from rising volatility
-        """)
 
 # ==================== STRATEGY BACKTESTING ====================
-elif page == "🎲 Strategy Backtesting":
-    st.title("🎲 Strategy Backtesting & Monte Carlo")
-    st.markdown("*Historical performance analysis with future projections*")
+elif page == "📊 Strategy Backtesting":
+    st.title("📊 Strategy Backtesting & Monte Carlo")
+    st.markdown("*Historical options trade analysis with future projections*")
     
     if not BACKTEST_AVAILABLE:
         st.error("❌ Backtesting module not available")
@@ -481,7 +676,7 @@ elif page == "🎲 Strategy Backtesting":
     
     if st.button("🚀 Run Backtest & Monte Carlo", type="primary"):
         try:
-            with st.spinner("Running analysis... This may take a minute"):
+            with st.spinner("Running analysis..."):
                 backtester = StrategyBacktester('trade_history.csv')
                 
                 # Backtest
@@ -516,34 +711,27 @@ elif page == "🎲 Strategy Backtesting":
             st.markdown("### 🎯 Performance Evaluation")
             
             if stats['win_rate'] >= 60:
-                st.success(f"✅ **Excellent**: Win rate of {stats['win_rate']:.1f}% indicates strong strategy")
+                st.success(f"✅ **Excellent**: Win rate of {stats['win_rate']:.1f}%")
             elif stats['win_rate'] >= 50:
-                st.warning(f"⚠️ **Good**: Win rate of {stats['win_rate']:.1f}% - room for improvement")
+                st.warning(f"⚠️ **Good**: Win rate of {stats['win_rate']:.1f}%")
             else:
-                st.error(f"❌ **Poor**: Win rate of {stats['win_rate']:.1f}% - strategy needs refinement")
+                st.error(f"❌ **Poor**: Win rate of {stats['win_rate']:.1f}%")
             
             if stats['profit_factor'] > 2:
-                st.success(f"✅ **Strong**: Profit factor of {stats['profit_factor']:.2f} shows excellent risk/reward")
+                st.success(f"✅ **Strong**: Profit factor {stats['profit_factor']:.2f}")
             elif stats['profit_factor'] > 1:
-                st.warning(f"⚠️ **Moderate**: Profit factor of {stats['profit_factor']:.2f} - profitable but can improve")
+                st.warning(f"⚠️ **Moderate**: Profit factor {stats['profit_factor']:.2f}")
             else:
-                st.error(f"❌ **Losing**: Profit factor {stats['profit_factor']:.2f} < 1 means net loss")
+                st.error(f"❌ **Losing**: Profit factor {stats['profit_factor']:.2f}")
             
             st.markdown("---")
             
             # Monte Carlo results
             st.markdown("### 🎲 Monte Carlo Projections")
             col1, col2, col3 = st.columns(3)
-            col1.metric("Probability of Profit", f"{mc_results['prob_profit']:.1f}%")
+            col1.metric("Prob of Profit", f"{mc_results['prob_profit']:.1f}%")
             col2.metric("Risk of Ruin", f"{mc_results['prob_ruin']:.1f}%")
-            col3.metric("Median Final Capital", f"₹{mc_results['median_final']:,.0f}")
-            
-            if mc_results['prob_profit'] > 70:
-                st.success("✅ Strong probability of profit")
-            elif mc_results['prob_profit'] > 50:
-                st.warning("⚠️ Moderate probability of profit")
-            else:
-                st.error("❌ Low probability of profit")
+            col3.metric("Median Final", f"₹{mc_results['median_final']:,.0f}")
             
             st.markdown("---")
             
@@ -555,7 +743,7 @@ elif page == "🎲 Strategy Backtesting":
             st.markdown("---")
             
             # Trade history
-            st.markdown("### 📋 Trade-by-Trade Breakdown")
+            st.markdown("### 📋 Trade Details")
             if backtester.results is not None and not backtester.results.empty:
                 st.dataframe(backtester.results, use_container_width=True, hide_index=True)
             
@@ -565,7 +753,7 @@ elif page == "🎲 Strategy Backtesting":
 
 # Footer
 st.sidebar.markdown("---")
-st.sidebar.info(f"📅 Last updated: {datetime.now().strftime('%H:%M:%S')}")
+st.sidebar.info(f"📅 {datetime.now().strftime('%H:%M:%S')}")
 if st.sidebar.button("🔄 Refresh"):
     st.cache_data.clear()
     st.rerun()
@@ -576,15 +764,5 @@ st.sidebar.markdown("""
 
 Built by Pratyush Singh
 
-[GitHub](https://github.com/GoDkiLLeR-04/Trivya-portfolio-tracker) | [LinkedIn](https://linkedin.com)
+[GitHub](https://github.com/GoDkiLLeR-04/Trivya-portfolio-tracker)
 """)
-
-
-
-
-
-
-
-
-
-
